@@ -30,17 +30,16 @@ typedef struct child_process
   struct child_process* next;
   pid_t pid;
   char* exec_name;
-  clock_t init;
-  time_t end;
+  time_t tiempo_inicial;
   int exit_code;
   int signal_value;
 } ch_p;
 
-ch_p* child_init(pid_t pid, char* exec_name, clock_t init){
+ch_p* child_init(pid_t pid, char* exec_name){
   ch_p* child = malloc(sizeof(ch_p));
   child->pid = pid;
   child->exec_name = exec_name;
-  child->init = init;
+  child->tiempo_inicial = time(NULL);
   child->next = NULL;
   // printf("Se creó un hijo con pid = %d\n", child->pid);
   // printf("El nombre del ejecutable es %s\n", child->exec_name);
@@ -58,17 +57,14 @@ void append_child(ch_p* child, ch_p* new_child){
 
 void print_childs(ch_p* child){
   ch_p* temp = child;
-  double total_t;
   while (temp != NULL){
     printf("PID: %d\n", temp->pid);
     printf("Nombre del ejecutable: %s\n", temp->exec_name);
-    total_t = (double) (clock() - temp->init) / CLOCKS_PER_SEC;
-    printf("Tiempo de ejecución: %f\n", total_t);
+    printf("Tiempo de ejecución: %ld\n", time(NULL) - child->tiempo_inicial);
     temp = temp->next;
   }
   return;
 }
-
 
 void destroy_child(ch_p* child){
   ch_p* temp;
@@ -82,8 +78,14 @@ void destroy_child(ch_p* child){
   return;
 }
 
+void time_out_child(ch_p* child){
+}
+
+
+
 
 // execv(path, argv)
+
 
 int main(int argc, char const *argv[])
 {
@@ -97,53 +99,96 @@ int main(int argc, char const *argv[])
   {
     char** input = read_user_input();
     char** args = &input[2];
+
+    pid_t pid;
+    int status;
+
     
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
-      // printf("Recibió los args %s\n", *args);
-
+      printf("Recibió los args %s\n", *args);
       // checkear si existe
+      char* path = input[1];
+      printf("Revisando %s...\n", path);
+      bool existe = false;
       struct stat buffer;
-      if (stat(input[1], &buffer) == -1)
-      {
-        printf("no existe\n");
+      if (stat(path, &buffer) == 0){
+        printf("Se encontró el programa %s\n", path);
+        existe = true;
+      }
+      char new_path[1000] = "/usr/bin/";
+      strcat(new_path, path);
+      if (stat(new_path, &buffer) == 0){
+        path = new_path;
+        printf("Se encontró el ejecutable %s\n", path);
+        existe = true;
+      }
+      if (!existe){
+        printf("No existe %s\n", path);
         continue;
       }
       
-      pid_t pid = fork();
+      pid = fork();
       
-      perror("start");
-
+      // perror("start");
+      
       if (pid == 0){
-        execv(input[1], args);
+        execv(path, args);
       }
       else if (pid > 0){
         // Se guardan los elementos del hijo
         if (cantidad_hijos == 0){
-          child = child_init(pid, input[1], clock());
+          child = child_init(pid, input[1]);
         }
         else{
-          new_child = child_init(pid, input[1], clock());
+          new_child = child_init(pid, input[1]);
           append_child(child, new_child);
         }
         cantidad_hijos += 1;
+        int status;
+        pid_t result = waitpid(pid, &status, WNOHANG);
+        // pid_t result = waitpid(pid, &status, 0);
+        if (result == 0){
+          printf("Padre: Hijo aún en ejecución. Continuando...\n");
+        }
+        else{
+          printf("Padre: Hijo terminado, exit code %d\n", WEXITSTATUS(status));
+        }
       }
     }
-
 
     // info
     if (string_equals(input[0], "info")){
       printf("funciona\n");
+      if (cantidad_hijos == 0){
+        printf("No hay hijos\n");
+        continue;
+      }
       printf("Mostrando los hijos del proceso %d que tiene %d hijos\n", getpid(), cantidad_hijos);
       print_childs(child);
     }
     
     
-    
     // timeout <time>
     if (string_equals(input[0], "timeout")){
-      int time = input[1];
+      char* time_string = input[1];
+      float time = atof(time_string);
+      clock_t time_i = clock();
+      clock_t tiempo_transcurrido;
+      float tiempo_seg = 0;
       // Validar si existen procesos en ejecucion
+      if (cantidad_hijos == 0){
+        printf("No existen procesos en ejecución. Timeout no se puede ejecutar\n");
+      }
+      else{
+        printf("Vamos a esperar %f segundos\n", time);
+        while(tiempo_seg < time){
+          tiempo_transcurrido = clock() - time_i;
+          tiempo_seg = (float) tiempo_transcurrido/CLOCKS_PER_SEC;
+        }
+        printf("Tiempo cumplido! (pasaron %f segundos)\n", tiempo_seg);
+
+      }
 
       // Si no, informar
         // printf("No hay procesos en ejecucion. Timeout no se puede ejecutar");
