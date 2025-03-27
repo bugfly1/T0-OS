@@ -1,0 +1,12 @@
+# Basado en el gitignore de EDD
+
+# Miscelánea
+!.devcontainer/devcontainer.json
+__pycache__/
+.py[co]
+*Zone.Identifier
+/bin
+/obj
+.vscode
+.DS_Store
+*.cmake
