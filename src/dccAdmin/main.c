@@ -31,6 +31,7 @@ typedef struct child_process
   pid_t pid;
   char* exec_name;
   time_t tiempo_inicial;
+  time_t tiempo_final;
   int exit_code;
   int signal_value;
 } ch_p;
@@ -57,10 +58,18 @@ void append_child(ch_p* child, ch_p* new_child){
 
 void print_childs(ch_p* child){
   ch_p* temp = child;
+  time_t tiempo_f;
   while (temp != NULL){
     printf("PID: %d\n", temp->pid);
     printf("Nombre del ejecutable: %s\n", temp->exec_name);
-    printf("Tiempo de ejecución: %ld\n", time(NULL) - child->tiempo_inicial);
+    if (temp->exit_code == -1){
+      tiempo_f = time(NULL);
+    }
+    else{
+      tiempo_f = child->tiempo_final;
+    }
+    printf("Tiempo de ejecución: %ld\n", tiempo_f - child->tiempo_inicial);
+    printf("Exit code: %d\n", temp->exit_code);
     temp = temp->next;
   }
   return;
@@ -70,15 +79,28 @@ void destroy_child(ch_p* child){
   ch_p* temp;
   while (child != NULL){
     temp = child->next;
-    printf("Padre: Liberando el hijo de pid: %d\n", child->pid);
-    kill(child->pid, SIGTERM);
+    printf("Padre: Liberando memoria del hijo de pid: %d\n", child->pid);
     free(child);
     child = temp;
     }
   return;
 }
 
-void time_out_child(ch_p* child){
+void sigterm_childs(ch_p* child){
+  ch_p* temp;
+  int result;
+  int status;
+  while (child != NULL){
+    temp = child->next;
+    if (child->exit_code == -1){
+      kill(child->pid, SIGTERM);
+      result = waitpid(child->pid, &status, WNOHANG);
+      child->exit_code = WEXITSTATUS(status);
+      child->tiempo_final = time(NULL);
+      printf("PID: %d nombre: %s tiempo: %ld exit_code: %d signal_value: (COMPLETAR)\n", child->pid, child->exec_name, time(NULL)-child->tiempo_inicial, child->exit_code);
+    }
+    child = temp;
+  }
 }
 
 
@@ -91,43 +113,47 @@ int main(int argc, char const *argv[])
 {
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
-  ch_p* child; // Guardaremos la información del hijo en ese struct
+  ch_p* child = NULL; // Guardaremos la información del hijo en ese struct
   ch_p* new_child; // Para ir agregando nuevos hijos
   int cantidad_hijos = 0;
+  pid_t pid;
 
+  
   while (1)
   {
+    // Se espera a que el hijo termine
+    int result;
+    int status;
+    if (child != NULL){
+      ch_p* temp = child;
+      printf("-------------------\n");
+      while (temp != NULL){
+        result = waitpid(temp->pid, &status, WNOHANG);
+        if (result != 0){
+          printf("Padre: El proceso pid  %i terminó, exit code %d\n", temp->pid, WEXITSTATUS(status));
+          temp->exit_code = WEXITSTATUS(status);
+        }
+        else{
+          printf("Padre: El proceso pdi %i aún no termina\n", temp->pid);
+          temp->exit_code = -1;
+        }
+        temp = temp->next;
+      }
+      printf("-------------------\n");
+    }
     char** input = read_user_input();
     char** args = &input[2];
-
-    pid_t pid;
-    int status;
-
+    
     
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
-      printf("Recibió los args %s\n", *args);
       // checkear si existe
       char* path = input[1];
-      printf("Revisando %s...\n", path);
-      bool existe = false;
       struct stat buffer;
-      if (stat(path, &buffer) == 0){
-        printf("Se encontró el programa %s\n", path);
-        existe = true;
-      }
-      char new_path[1000] = "/usr/bin/";
-      strcat(new_path, path);
-      if (stat(new_path, &buffer) == 0){
-        path = new_path;
-        printf("Se encontró el ejecutable %s\n", path);
-        existe = true;
-      }
-      if (!existe){
-        printf("No existe %s\n", path);
+      if (stat(path, &buffer) != 0){
+        printf("No se encontró el programa %s\n", path);
         continue;
-      }
-      
+      }      
       pid = fork();
       
       // perror("start");
@@ -139,31 +165,23 @@ int main(int argc, char const *argv[])
         // Se guardan los elementos del hijo
         if (cantidad_hijos == 0){
           child = child_init(pid, input[1]);
+          if (child != NULL){
+          }
         }
         else{
           new_child = child_init(pid, input[1]);
           append_child(child, new_child);
         }
         cantidad_hijos += 1;
-        int status;
-        pid_t result = waitpid(pid, &status, WNOHANG);
-        // pid_t result = waitpid(pid, &status, 0);
-        if (result == 0){
-          printf("Padre: Hijo aún en ejecución. Continuando...\n");
-        }
-        else{
-          printf("Padre: Hijo terminado, exit code %d\n", WEXITSTATUS(status));
-        }
       }
     }
 
     // info
     if (string_equals(input[0], "info")){
-      printf("funciona\n");
-      if (cantidad_hijos == 0){
-        printf("No hay hijos\n");
-        continue;
-      }
+      // if (cantidad_hijos == 0){
+      //   printf("No hay hijos\n");
+      //   continue;
+      // }
       printf("Mostrando los hijos del proceso %d que tiene %d hijos\n", getpid(), cantidad_hijos);
       print_childs(child);
     }
@@ -187,6 +205,7 @@ int main(int argc, char const *argv[])
           tiempo_seg = (float) tiempo_transcurrido/CLOCKS_PER_SEC;
         }
         printf("Tiempo cumplido! (pasaron %f segundos)\n", tiempo_seg);
+        sigterm_childs(child);
 
       }
 
