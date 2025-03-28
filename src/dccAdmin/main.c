@@ -41,6 +41,7 @@ ch_p* child_init(pid_t pid, char* exec_name){
   child->pid = pid;
   child->exec_name = exec_name;
   child->tiempo_inicial = time(NULL);
+  child->tiempo_final = time(NULL);
   child->next = NULL;
   // printf("Se creó un hijo con pid = %d\n", child->pid);
   // printf("El nombre del ejecutable es %s\n", child->exec_name);
@@ -66,9 +67,9 @@ void print_childs(ch_p* child){
       tiempo_f = time(NULL);
     }
     else{
-      tiempo_f = child->tiempo_final;
+      tiempo_f = temp->tiempo_final;
     }
-    printf("Tiempo de ejecución: %ld\n", tiempo_f - child->tiempo_inicial);
+    printf("Tiempo de ejecución: %ld\n", tiempo_f - temp->tiempo_inicial);
     printf("Exit code: %d\n", temp->exit_code);
     temp = temp->next;
   }
