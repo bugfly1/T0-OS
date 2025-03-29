@@ -1,113 +1,10 @@
-#include "../input_manager/manager.h"
-
-
-#include <unistd.h>     /* Symbolic Constants */
-#include <sys/types.h>  /* Primitive System Data Types */ 
-#include <errno.h>      /* Errors */
-#include <stdio.h>      /* Input/Output */
-#include <sys/wait.h>   /* Wait for Process Termination */
-#include <stdlib.h>     /* General Utilities */
-
-#include <sys/stat.h>
-#include <signal.h>
-
-#include <stdbool.h>
-#include <string.h>
-
-#include <time.h>
-
-
+#include "child.h"
 
 // Esto lo saque de las tareas de EDD, los amo ayudantes de EDD
 /* Retorna true si ambos strings son iguales */
 static bool string_equals(char *string1, char *string2) {
   return !strcmp(string1, string2);
 }
-
-
-typedef struct child_process
-{
-  struct child_process* next;
-  pid_t pid;
-  char* exec_name;
-  time_t tiempo_inicial;
-  time_t tiempo_final;
-  int exit_code;
-  int signal_value;
-} ch_p;
-
-ch_p* child_init(pid_t pid, char* exec_name){
-  ch_p* child = malloc(sizeof(ch_p));
-  child->pid = pid;
-  child->exec_name = exec_name;
-  child->tiempo_inicial = time(NULL);
-  child->tiempo_final = time(NULL);
-  child->next = NULL;
-  // printf("Se creó un hijo con pid = %d\n", child->pid);
-  // printf("El nombre del ejecutable es %s\n", child->exec_name);
-  return child;
-} 
-
-void append_child(ch_p* child, ch_p* new_child){
-  ch_p* temp = child;
-  while (temp->next != NULL){
-    temp = temp->next;
-  }
-  temp->next = new_child;
-  return;
-}
-
-void print_childs(ch_p* child){
-  ch_p* temp = child;
-  time_t tiempo_f;
-  while (temp != NULL){
-    printf("PID: %d\n", temp->pid);
-    printf("Nombre del ejecutable: %s\n", temp->exec_name);
-    if (temp->exit_code == -1){
-      tiempo_f = time(NULL);
-    }
-    else{
-      tiempo_f = temp->tiempo_final;
-    }
-    printf("Tiempo de ejecución: %ld\n", tiempo_f - temp->tiempo_inicial);
-    printf("Exit code: %d\n", temp->exit_code);
-    temp = temp->next;
-  }
-  return;
-}
-
-void destroy_child(ch_p* child){
-  ch_p* temp;
-  while (child != NULL){
-    temp = child->next;
-    printf("Padre: Liberando memoria del hijo de pid: %d\n", child->pid);
-    free(child);
-    child = temp;
-    }
-  return;
-}
-
-void sigterm_childs(ch_p* child){
-  ch_p* temp;
-  int result;
-  int status;
-  while (child != NULL){
-    temp = child->next;
-    if (child->exit_code == -1){
-      kill(child->pid, SIGTERM);
-      result = waitpid(child->pid, &status, WNOHANG);
-      child->exit_code = WEXITSTATUS(status);
-      child->tiempo_final = time(NULL);
-      printf("PID: %d nombre: %s tiempo: %ld exit_code: %d signal_value: (COMPLETAR)\n", child->pid, child->exec_name, time(NULL)-child->tiempo_inicial, child->exit_code);
-    }
-    child = temp;
-  }
-}
-
-
-
-
-// execv(path, argv)
 
 
 int main(int argc, char const *argv[])
@@ -119,6 +16,12 @@ int main(int argc, char const *argv[])
   int cantidad_hijos = 0;
   pid_t pid;
 
+  int time_max = -1;
+
+  if (argc == 2) // Se agrego el parametro time_max
+  {
+    time_max = atoi(argv[1]);
+  }
   
   while (1)
   {
@@ -142,14 +45,18 @@ int main(int argc, char const *argv[])
       }
       printf("-------------------\n");
     }
-    char** input = read_user_input();
-    char** args = &input[2];
     
+    
+    char** input = read_user_input();
+    char* path = input[1];
+    char** args = &input[2];
+
+    //printf("%s\n", path);
     
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
       // checkear si existe
-      char* path = input[1];
+      
       struct stat buffer;
       if (stat(path, &buffer) != 0){
         printf("No se encontró el programa %s\n", path);
@@ -158,7 +65,6 @@ int main(int argc, char const *argv[])
       pid = fork();
       
       // perror("start");
-      
       if (pid == 0){
         execv(path, args);
       }
@@ -183,7 +89,9 @@ int main(int argc, char const *argv[])
       //   printf("No hay hijos\n");
       //   continue;
       // }
+      
       printf("Mostrando los hijos del proceso %d que tiene %d hijos\n", getpid(), cantidad_hijos);
+      printf("|  PID  | Executable | Exec Time | Exit code | Signal Value |\n");
       print_childs(child);
     }
     
