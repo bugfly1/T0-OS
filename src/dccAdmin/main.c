@@ -15,6 +15,8 @@ int main(int argc, char const *argv[])
   ch_p* new_child; // Para ir agregando nuevos hijos
   int cantidad_hijos = 0;
   pid_t pid;
+  ch_p* temp;
+  int kill_ok;
 
   int time_max = -1;
 
@@ -29,7 +31,7 @@ int main(int argc, char const *argv[])
     int result;
     int status;
     if (child != NULL){
-      ch_p* temp = child;
+      temp = child;
       printf("-------------------\n");
       while (temp != NULL){
         result = waitpid(temp->pid, &status, WNOHANG);
@@ -44,6 +46,55 @@ int main(int argc, char const *argv[])
         temp = temp->next;
       }
       printf("-------------------\n");
+    }
+
+    // Revisar el timemax
+    if (time_max != -1){
+      printf("Time max %i\n", time_max);
+      temp = child;
+      time_t tiempo_f;
+      time_t tiempo_proceso;
+      while (temp != NULL){
+        if (temp->exit_code == -1){
+          tiempo_f = time(NULL);
+        }
+        else{
+          tiempo_f = temp->tiempo_final;
+        }
+        tiempo_proceso = tiempo_f - temp->tiempo_inicial;
+        // Revisamos que el tiempo de proceso sea mayor Y que no haya terminado
+        if (tiempo_proceso > time_max && temp->exit_code == -1){
+          if (!temp->senal_enviada){
+            // Significa que aún no se le ha enviado una señal para que termine
+            printf("El proceso %i lleva %li segundos!!\n", temp->pid, tiempo_proceso);
+            printf("Usando SIGTERM en el proceso %d\n", temp->pid);
+            kill_ok = kill(SIGTERM, temp->pid);
+            if (kill_ok == 0){
+              printf("Funcionó\n");
+            }
+            else{
+              printf("Error\n");
+            }
+            temp->senal_enviada = true;
+            temp->inicio_cuenta_regresiva = time(NULL);
+          }
+          else{
+            // Significa que ya se le envió la señal y no ha terminado
+            if (time(NULL) - temp->inicio_cuenta_regresiva > 5){
+              printf("El proceso %i aún no termina y pasaron %li segundos\n", temp->pid, time(NULL) - temp->inicio_cuenta_regresiva);
+              printf("Usando SIGKILL\n");
+              kill_ok = kill(SIGKILL, temp->pid);
+              if (kill_ok == 0){
+                printf("Funcionó\n");
+              }
+              else{
+                printf("Error\n");
+              }
+            }
+          }
+        }
+        temp = temp->next;
+      }
     }
     
     

@@ -10,6 +10,8 @@ ch_p* child_init(pid_t pid, char* exec_name){
     child->exec_name = copy;
     child->tiempo_inicial = time(NULL);
     child->tiempo_final = time(NULL);
+    child->inicio_cuenta_regresiva = time(NULL);
+    child->senal_enviada = false;
     child->exit_code = -1;
     child->signal_value = -1;
     child->next = NULL;

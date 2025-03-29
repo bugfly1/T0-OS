@@ -26,8 +26,10 @@ typedef struct child_process
   char* exec_name;
   time_t tiempo_inicial;
   time_t tiempo_final;
+  time_t inicio_cuenta_regresiva;
   int exit_code;
   int signal_value;
+  bool senal_enviada;
 } ch_p;
 
 ch_p* child_init(pid_t pid, char* exec_name);
