@@ -24,6 +24,7 @@ int main(int argc, char const *argv[])
   {
     time_max = atoi(argv[1]);
   }
+
   
   while (1)
   {
@@ -100,7 +101,6 @@ int main(int argc, char const *argv[])
     
     char** input = read_user_input();
     char* path = input[1];
-    char** args = &input[2];
 
     //printf("%s\n", path);
     
@@ -117,7 +117,7 @@ int main(int argc, char const *argv[])
       
       // perror("start");
       if (pid == 0){
-        execv(path, args);
+        execv(path, &input[1]);
       }
       else if (pid > 0){
         // Se guardan los elementos del hijo
@@ -136,13 +136,11 @@ int main(int argc, char const *argv[])
 
     // info
     if (string_equals(input[0], "info")){
-      // if (cantidad_hijos == 0){
-      //   printf("No hay hijos\n");
-      //   continue;
-      // }
-      
+      if (cantidad_hijos == 0){
+        printf("No hay hijos\n");
+        continue;
+      }
       printf("Mostrando los hijos del proceso %d que tiene %d hijos\n", getpid(), cantidad_hijos);
-      printf("|  PID  | Executable | Exec Time | Exit code | Signal Value |\n");
       print_childs(child);
     }
     

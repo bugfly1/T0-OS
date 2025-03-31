@@ -1,7 +1,6 @@
 #pragma once
 #include "../input_manager/manager.h"
 
-
 #include <unistd.h>     /* Symbolic Constants */
 #include <sys/types.h>  /* Primitive System Data Types */ 
 #include <errno.h>      /* Errors */
@@ -16,8 +15,6 @@
 #include <string.h>
 
 #include <time.h>
-
-
 
 typedef struct child_process
 {

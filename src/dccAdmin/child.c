@@ -2,7 +2,7 @@
 
 
 ch_p* child_init(pid_t pid, char* exec_name){
-    char* copy = calloc(64, sizeof(char));
+    char* copy = calloc(BUFFER_SIZE, sizeof(char));
     strcpy(copy, exec_name);
 
     ch_p* child = malloc(sizeof(ch_p));
@@ -18,7 +18,7 @@ ch_p* child_init(pid_t pid, char* exec_name){
 
 
     // printf("Se creó un hijo con pid = %d\n", child->pid);
-    printf("El nombre del ejecutable es %s\n", child->exec_name);
+    //printf("El nombre del ejecutable es %s\n", child->exec_name);
     return child;
 } 
 
@@ -34,6 +34,7 @@ void append_child(ch_p* child, ch_p* new_child){
 void print_childs(ch_p* child){
     ch_p* temp = child;
     time_t tiempo_f;
+    printf("|  PID  | Executable | Exec Time | Exit code | Signal Value |\n");
     while (temp != NULL){       
         if (temp->exit_code == -1){
         tiempo_f = time(NULL);
