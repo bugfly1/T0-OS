@@ -3,6 +3,7 @@
 // Variables globales para usar en sigchld handler
 ch_p* child = NULL; // Guardaremos la información del hijo en ese struct
 ch_p* new_child; // Para ir agregando nuevos hijos
+int procesos_activos;
 
 // Variables globales para ctrl C handler
 bool loop = true;
@@ -36,6 +37,7 @@ void sigchld_handler(int signal){
       }
     }
   }
+  procesos_activos -= 1;
 }
 
 
@@ -51,14 +53,29 @@ void sigctrlC_handler(int sig){
   closeShell = true;
 }
 
+void handle_alarm(int sig){
+  ch_p* temp = child;
+  if (procesos_activos != 0){
+    printf("Timeout cumplido!\n");
+    while (temp != NULL){
+      if (temp->exit_code == -1){
+        printf("Terminando el procesos %d\n", temp->pid);
+        kill(temp->pid, SIGTERM);
+      }
+      temp = temp->next;
+    }
+  }
+}
+
 int main(int argc, char const *argv[])
 {
   signal(SIGCHLD, sigchld_handler);
   signal(SIGINT, sigctrlC_handler);
+  signal(SIGALRM, handle_alarm);
   
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
-  int cantidad_hijos = 0;
+  procesos_activos = 0;
   pid_t pid;
   ch_p* temp;
   int kill_ok;
@@ -144,7 +161,7 @@ int main(int argc, char const *argv[])
       }
       else if (pid > 0){
         // Se guardan los elementos del hijo
-        if (cantidad_hijos == 0){
+        if (child == NULL){
           child = child_init(pid, input[1]);
           if (child != NULL){
           }
@@ -153,17 +170,17 @@ int main(int argc, char const *argv[])
           new_child = child_init(pid, input[1]);
           append_child(child, new_child);
         }
-        cantidad_hijos += 1;
+        procesos_activos += 1;
       }
     }
 
     // info
     if (string_equals(input[0], "info")){
-      if (cantidad_hijos == 0){
+      if (child == NULL){
         printf("No hay hijos\n");
         continue;
       }
-      printf("Mostrando los hijos del proceso %d que tiene %d hijos\n", getpid(), cantidad_hijos);
+      printf("Mostrando los hijos del proceso %d\n", getpid());
       print_childs(child);
     }
     
@@ -171,24 +188,31 @@ int main(int argc, char const *argv[])
     // timeout <time>
     if (string_equals(input[0], "timeout")){
       char* time_string = input[1];
-      float time = atof(time_string);
-      clock_t time_i = clock();
-      clock_t tiempo_transcurrido;
-      float tiempo_seg = 0;
-      // Validar si existen procesos en ejecucion
-      if (cantidad_hijos == 0){
-        printf("No existen procesos en ejecución. Timeout no se puede ejecutar\n");
+      int time = atoi(time_string);
+      if (procesos_activos == 0){
+        printf("No hay procesos en ejecución. Timeout no se puede ejecutar.\n");
       }
       else{
-        printf("Vamos a esperar %f segundos\n", time);
-        while(tiempo_seg < time){
-          tiempo_transcurrido = clock() - time_i;
-          tiempo_seg = (float) tiempo_transcurrido/CLOCKS_PER_SEC;
-        }
-        printf("Tiempo cumplido! (pasaron %f segundos)\n", tiempo_seg);
-        sigterm_childs(child);
-
+        printf("Vamos a esperar %d segundos\n", time);
+        alarm(time);
       }
+      // float time = atof(time_string);
+      // clock_t time_i = clock();
+      // clock_t tiempo_transcurrido;
+      // float tiempo_seg = 0;
+      // // Validar si existen procesos en ejecucion
+      // if (procesos_activos == 0){
+      //   printf("No existen procesos en ejecución. Timeout no se puede ejecutar\n");
+      // }
+      // else{
+      //   printf("Vamos a esperar %f segundos\n", time);
+      //   while(tiempo_seg < time){
+      //     tiempo_transcurrido = clock() - time_i;
+      //     tiempo_seg = (float) tiempo_transcurrido/CLOCKS_PER_SEC;
+      //   }
+      //   printf("Tiempo cumplido! (pasaron %f segundos)\n", tiempo_seg);
+      //   sigterm_childs(child);
+      // }
 
     }
       
