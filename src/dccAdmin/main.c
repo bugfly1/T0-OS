@@ -1,5 +1,39 @@
 #include "child.h"
 
+// Variables globales para usar en sigchld handler
+ch_p* child = NULL; // Guardaremos la información del hijo en ese struct
+ch_p* new_child; // Para ir agregando nuevos hijos
+
+void sigchld_handler(int signal){
+  printf("Ejecutando sigchld handler\n");
+  while (1){
+    int status;
+    pid_t pid = waitpid(-1, &status, WNOHANG);
+    if (pid <= 0){
+      break;
+    }
+    if (WIFEXITED(status) || WIFSIGNALED(status)){
+      printf("Se terminó el proceso %d con term signal %d\n", pid, WTERMSIG(status));
+      if (child != NULL){
+        // Recorremos hasta encontrar el hijo que tiene este pid
+        ch_p* temp = child;
+        while (temp != NULL){
+          if (temp->pid == pid){
+            temp->tiempo_final = time(NULL);
+            temp->exit_code = WEXITSTATUS(status);
+            temp->signal_value = WTERMSIG(status);
+          }
+          temp = temp->next;
+        }
+      }
+      else{
+        printf("Esto no debería pasar\n");
+      }
+    }
+  }
+}
+
+
 // Esto lo saque de las tareas de EDD, los amo ayudantes de EDD
 /* Retorna true si ambos strings son iguales */
 static bool string_equals(char *string1, char *string2) {
@@ -9,10 +43,9 @@ static bool string_equals(char *string1, char *string2) {
 
 int main(int argc, char const *argv[])
 {
+  signal(SIGCHLD, sigchld_handler);
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
-  ch_p* child = NULL; // Guardaremos la información del hijo en ese struct
-  ch_p* new_child; // Para ir agregando nuevos hijos
   int cantidad_hijos = 0;
   pid_t pid;
   ch_p* temp;
@@ -28,26 +61,6 @@ int main(int argc, char const *argv[])
   
   while (1)
   {
-    // Se espera a que el hijo termine
-    int result;
-    int status;
-    if (child != NULL){
-      temp = child;
-      printf("-------------------\n");
-      while (temp != NULL){
-        result = waitpid(temp->pid, &status, WNOHANG);
-        if (result != 0){
-          printf("Padre: El proceso pid  %i terminó, exit code %d\n", temp->pid, WEXITSTATUS(status));
-          temp->exit_code = WEXITSTATUS(status);
-        }
-        else{
-          printf("Padre: El proceso pdi %i aún no termina\n", temp->pid);
-          temp->exit_code = -1;
-        }
-        temp = temp->next;
-      }
-      printf("-------------------\n");
-    }
 
     // Revisar el timemax
     if (time_max != -1){

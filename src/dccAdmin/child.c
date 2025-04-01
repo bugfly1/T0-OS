@@ -71,18 +71,18 @@ void destroy_child(ch_p* child){
 
 void sigterm_childs(ch_p* child){
     ch_p* temp;
-    int result;
-    int status;
+    // int result;
+    // int status;
     while (child != NULL){
         temp = child->next;
         if (child->exit_code == -1){
         kill(child->pid, SIGTERM);
-        result = waitpid(child->pid, &status, WNOHANG);
-        child->exit_code = WEXITSTATUS(status);
-        child->tiempo_final = time(NULL);
-        if (WIFSIGNALED(status)) child->signal_value = WTERMSIG(status);
+        // result = waitpid(child->pid, &status, WNOHANG);
+        // child->exit_code = WEXITSTATUS(status);
+        // child->tiempo_final = time(NULL);
+        // if (WIFSIGNALED(status)) child->signal_value = WTERMSIG(status);
 
-        printf("PID: %d nombre: %s tiempo: %ld exit_code: %d signal_value: %d\n", child->pid, child->exec_name, time(NULL)-child->tiempo_inicial, child->exit_code, child->signal_value);
+        // printf("PID: %d nombre: %s tiempo: %ld exit_code: %d signal_value: %d\n", child->pid, child->exec_name, time(NULL)-child->tiempo_inicial, child->exit_code, child->signal_value);
         }
         child = temp;
     }
