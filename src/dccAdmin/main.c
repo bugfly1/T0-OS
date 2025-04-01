@@ -4,6 +4,11 @@
 ch_p* child = NULL; // Guardaremos la información del hijo en ese struct
 ch_p* new_child; // Para ir agregando nuevos hijos
 
+// Variables globales para ctrl C handler
+bool loop = true;
+bool closeShell = false;
+
+
 void sigchld_handler(int signal){
   printf("Ejecutando sigchld handler\n");
   while (1){
@@ -40,10 +45,17 @@ static bool string_equals(char *string1, char *string2) {
   return !strcmp(string1, string2);
 }
 
+// Simplemente deja que pase por la parte de quit y que salga
+void sigctrlC_handler(int sig){
+  loop = false;
+  closeShell = true;
+}
 
 int main(int argc, char const *argv[])
 {
   signal(SIGCHLD, sigchld_handler);
+  signal(SIGINT, sigctrlC_handler);
+  
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
   int cantidad_hijos = 0;
@@ -59,7 +71,7 @@ int main(int argc, char const *argv[])
   }
 
   
-  while (1)
+  while (loop)
   {
 
     // Revisar el timemax
@@ -114,13 +126,11 @@ int main(int argc, char const *argv[])
     
     char** input = read_user_input();
     char* path = input[1];
-
-    //printf("%s\n", path);
     
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
-      // checkear si existe
       
+      // checkear si existe
       struct stat buffer;
       if (stat(path, &buffer) != 0){
         printf("No se encontró el programa %s\n", path);
@@ -180,22 +190,15 @@ int main(int argc, char const *argv[])
 
       }
 
-      // Si no, informar
-        // printf("No hay procesos en ejecucion. Timeout no se puede ejecutar");
-        // continue;
-        
-        // Si hay
-        // wait(time)
-        // Si no finaliza imprimir wea
-        
-      }
+    }
       
-      // quit
-      if (string_equals(input[0], "quit")){
-        printf("bye bye\n");
-        
-        // Enviar SIGINT
-        destroy_child(child);
+    // quit
+    if (string_equals(input[0], "quit") || closeShell){
+      printf("bye bye\n");
+      
+      // Enviar SIGINT
+      destroy_child(child);
+      free_user_input(input);
       break;
     }
 
