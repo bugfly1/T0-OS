@@ -21,7 +21,7 @@ void sigchld_handler(int signal){
     if (pid <= 0){
       break;
     }
-    if (WEXITSTATUS(status) == 22){
+    if (WEXITSTATUS(status) == 22 || WEXITSTATUS(status) == 23){
       printf("Eliminando procesos después de los 10 segundos\n");
       ch_p* temp = child;
       while(temp != NULL){
@@ -31,7 +31,12 @@ void sigchld_handler(int signal){
         }
         temp = temp->next;
       }
-      quit = true;
+      if (WEXITSTATUS(status) == 22){
+        quit = true;
+      }
+      else{
+        quit = false;
+      }
     }
     if (WIFEXITED(status) || WIFSIGNALED(status)){
       printf("Se terminó el proceso %d con term signal %d\n", pid, WTERMSIG(status));
@@ -50,9 +55,9 @@ void sigchld_handler(int signal){
       else{
         printf("Esto no debería pasar\n");
       }
+      procesos_activos -= 1;
     }
   }
-  procesos_activos -= 1;
 }
 
 
@@ -220,7 +225,20 @@ int main(int argc, char const *argv[])
       }
       else{
         printf("Vamos a esperar %d segundos\n", time);
-        alarm(time);
+        pid = fork();
+        if (pid == 0){
+        printf("Esperando %d segundos...\n", time);
+        clock_t start_time = clock();
+        clock_t tiempo_transcurrido;
+        float tiempo_seg = 0;
+        while (tiempo_seg < time){
+            tiempo_transcurrido = clock() - start_time;
+            tiempo_seg = tiempo_transcurrido/CLOCKS_PER_SEC;
+        }        
+        printf("Pasaron %d segundos!\n", time);
+        return 23;
+        }
+        // alarm(time);
       }
 
     }
