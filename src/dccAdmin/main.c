@@ -99,10 +99,9 @@ void handle_alarm(int sig){
 
 int main(int argc, char const *argv[])
 {
-  // signal(SIGCHLD, sigchld_handler);
-  // signal(SIGINT, sigctrlC_handler);
-  // sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigctrlC_handler }, NULL);
-  // signal(SIGALRM, handle_alarm);
+  signal(SIGCHLD, sigchld_handler);
+  signal(SIGINT, sigctrlC_handler);
+  signal(SIGALRM, handle_alarm);
   
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
@@ -232,7 +231,7 @@ int main(int argc, char const *argv[])
       }
       else{
         printf("Vamos a esperar %d segundos\n", time);
-        // pid = fork();
+        pid = fork();
         if (pid == 0){
           printf("Esperando %d segundos...\n", time);
           clock_t start_time = clock();
@@ -265,7 +264,7 @@ int main(int argc, char const *argv[])
           temp = temp->next;
         }
       }
-      // pid = fork();
+      pid = fork();
       if (pid == 0){
         // Proceso hijo para revisar tiempo
         printf("Esperando 10 segundos...\n");
