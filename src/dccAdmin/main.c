@@ -9,54 +9,63 @@ int procesos_activos;
 bool loop = true;
 bool closeShell = false;
 
-// Variable global para modificar el quit
-bool quit = false;
-
 
 void sigchld_handler(int signal){
   printf("Ejecutando sigchld handler\n");
-  while (1){
-    int status;
-    pid_t pid = waitpid(-1, &status, WNOHANG);
-    if (pid <= 0){
-      break;
+  int status;
+  pid_t pid = waitpid(-1, &status, WNOHANG);
+
+
+  if (WEXITSTATUS(status) == 23){
+    printf("Eliminando procesos después de los 10 segundos\n");
+    ch_p* temp = child;
+    while(temp != NULL){
+      if (temp->exit_code == -1){
+        printf("Proceso %d\n", temp->pid);
+        kill(temp->pid, SIGTERM);
+      }
+      temp = temp->next;
     }
-    if (WEXITSTATUS(status) == 22 || WEXITSTATUS(status) == 23){
-      printf("Eliminando procesos después de los 10 segundos\n");
+  }
+
+  // Handle quit
+  if (WEXITSTATUS(status) == 22){
+    printf("Eliminando procesos después de los 10 segundos\n");
+    ch_p* temp = child;
+    while(temp != NULL){
+      if (temp->exit_code == -1){
+        printf("Proceso %d\n", temp->pid);
+        kill(temp->pid, SIGKILL);
+      }
+      temp = temp->next;
+    }
+    printf("Pasaron 10 segundos!\n");
+    print_childs(child);
+    destroy_child(child);
+    // free_user_input(input);
+    exit(0);
+  }
+
+
+  if (WIFEXITED(status) || WIFSIGNALED(status)){
+    printf("Se terminó el proceso %d con term signal %d\n", pid, WTERMSIG(status));
+    if (child != NULL){
+      // Recorremos hasta encontrar el hijo que tiene este pid
       ch_p* temp = child;
-      while(temp != NULL){
-        if (temp->exit_code == -1){
-          printf("Proceso %d\n", temp->pid);
-          kill(temp->pid, SIGKILL);
+      while (temp != NULL){
+        if (temp->pid == pid){
+          temp->tiempo_final = time(NULL);
+          temp->exit_code = WEXITSTATUS(status);
+          temp->signal_value = WTERMSIG(status);
         }
         temp = temp->next;
       }
-      if (WEXITSTATUS(status) == 22){
-        quit = true;
-      }
-      else{
-        quit = false;
-      }
     }
-    if (WIFEXITED(status) || WIFSIGNALED(status)){
-      printf("Se terminó el proceso %d con term signal %d\n", pid, WTERMSIG(status));
-      if (child != NULL){
-        // Recorremos hasta encontrar el hijo que tiene este pid
-        ch_p* temp = child;
-        while (temp != NULL){
-          if (temp->pid == pid){
-            temp->tiempo_final = time(NULL);
-            temp->exit_code = WEXITSTATUS(status);
-            temp->signal_value = WTERMSIG(status);
-          }
-          temp = temp->next;
-        }
-      }
-      else{
-        printf("Esto no debería pasar\n");
-      }
-      procesos_activos -= 1;
+    else{
+      printf("Esto no debería pasar\n");
     }
+
+    procesos_activos -= 1;
   }
 }
 
@@ -65,12 +74,6 @@ void sigchld_handler(int signal){
 /* Retorna true si ambos strings son iguales */
 static bool string_equals(char *string1, char *string2) {
   return !strcmp(string1, string2);
-}
-
-// Simplemente deja que pase por la parte de quit y que salga
-void sigctrlC_handler(int sig){
-  loop = false;
-  closeShell = true;
 }
 
 void handle_alarm(int sig){
@@ -95,12 +98,12 @@ void handle_alarm(int sig){
       temp = temp->next;
     }
   }
+  printf("print alarm\n");
 }
 
 int main(int argc, char const *argv[])
 {
   signal(SIGCHLD, sigchld_handler);
-  signal(SIGINT, sigctrlC_handler);
   signal(SIGALRM, handle_alarm);
   
   printf("Ta corriendo\n");
@@ -118,7 +121,7 @@ int main(int argc, char const *argv[])
   }
 
 
-  while (loop)
+  while (1)
   {
 
     // Revisar el timemax
@@ -175,15 +178,28 @@ int main(int argc, char const *argv[])
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
       
+      // Check: el path es NULL?
+      if (input[1] == NULL)
+      {
+        printf("Porfavor ingrese un path valido >:(\n");
+        free_user_input(input);
+        continue;
+      }
+      
+
       pid = fork();
       if (pid < 0)
       {
         perror("Error en fork");
 
       } else if (pid == 0){
+        signal(SIGKILL, SIG_DFL);
+        signal(SIGCHLD, SIG_DFL);
         // Aqui se llevan a cabo los Child Processes
 
         // Revisa si el ejecutable se encuentra en el directorio actual
+        alarm(time_max);
+
         struct stat buffer;
         if (stat(input[1], &buffer) == 0)
         {
@@ -250,7 +266,7 @@ int main(int argc, char const *argv[])
     }
       
     // quit
-    if (string_equals(input[0], "quit") || closeShell){
+    if (string_equals(input[0], "quit")){
       printf("bye bye\n");
       
       // Enviar SIGINT
@@ -272,17 +288,12 @@ int main(int argc, char const *argv[])
         clock_t tiempo_transcurrido;
         float tiempo_seg = 0;
         while (tiempo_seg < 10){
-            tiempo_transcurrido = clock() - start_time;
-            tiempo_seg = tiempo_transcurrido/CLOCKS_PER_SEC;
+          tiempo_transcurrido = clock() - start_time;
+          tiempo_seg = tiempo_transcurrido/CLOCKS_PER_SEC;
         }        
-        printf("Pasaron 10 segundos!\n");
+
         return 22;
       }
-    }
-    if (quit){
-      destroy_child(child);
-      free_user_input(input);
-      break;
     }
     free_user_input(input);
   }
