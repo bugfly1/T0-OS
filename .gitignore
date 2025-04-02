@@ -12,3 +12,5 @@ obj/
 *.cmake
 programa
 programa.c
+p
+pr.c

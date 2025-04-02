@@ -99,9 +99,10 @@ void handle_alarm(int sig){
 
 int main(int argc, char const *argv[])
 {
-  signal(SIGCHLD, sigchld_handler);
-  signal(SIGINT, sigctrlC_handler);
-  signal(SIGALRM, handle_alarm);
+  // signal(SIGCHLD, sigchld_handler);
+  // signal(SIGINT, sigctrlC_handler);
+  // sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigctrlC_handler }, NULL);
+  // signal(SIGALRM, handle_alarm);
   
   printf("Ta corriendo\n");
   printf("Proceso con id %d\n", getpid());
@@ -118,7 +119,6 @@ int main(int argc, char const *argv[])
   }
 
 
-  
   while (loop)
   {
 
@@ -171,27 +171,34 @@ int main(int argc, char const *argv[])
       }
     }
     
-    
     char** input = read_user_input();
-    char* path = input[1];
     
     // start <executable> <arg1> <arg2> ... <argn>
     if (string_equals(input[0], "start")){
       
-      // checkear si existe
-      struct stat buffer;
-      if (stat(path, &buffer) != 0){
-        printf("No se encontró el programa %s\n", path);
-        continue;
-      }      
       pid = fork();
-      
-      // perror("start");
-      if (pid == 0){
-        execv(path, &input[1]);
-      }
-      else if (pid > 0){
+      if (pid < 0)
+      {
+        perror("Error en fork");
+
+      } else if (pid == 0){
+        // Aqui se llevan a cabo los Child Processes
+
+        // Revisa si el ejecutable se encuentra en el directorio actual
+        struct stat buffer;
+        if (stat(input[1], &buffer) == 0)
+        {
+          execv(input[1], &input[1]);
+        }else{
+          execvp(input[1], &input[1]);
+        }
+        // Revisa /bin/
+        perror("Error");
+        return EXIT_FAILURE;
+
+      } else if (pid > 0){
         // Se guardan los elementos del hijo
+        
         if (child == NULL){
           child = child_init(pid, input[1]);
           if (child != NULL){
@@ -209,10 +216,10 @@ int main(int argc, char const *argv[])
     if (string_equals(input[0], "info")){
       if (child == NULL){
         printf("No hay hijos\n");
-        continue;
+      } else {
+        printf("Mostrando los hijos del proceso %d\n", getpid());
+        print_childs(child);
       }
-      printf("Mostrando los hijos del proceso %d\n", getpid());
-      print_childs(child);
     }
     
     
@@ -225,18 +232,18 @@ int main(int argc, char const *argv[])
       }
       else{
         printf("Vamos a esperar %d segundos\n", time);
-        pid = fork();
+        // pid = fork();
         if (pid == 0){
-        printf("Esperando %d segundos...\n", time);
-        clock_t start_time = clock();
-        clock_t tiempo_transcurrido;
-        float tiempo_seg = 0;
-        while (tiempo_seg < time){
+          printf("Esperando %d segundos...\n", time);
+          clock_t start_time = clock();
+          clock_t tiempo_transcurrido;
+          float tiempo_seg = 0;
+          while (tiempo_seg < time){
             tiempo_transcurrido = clock() - start_time;
             tiempo_seg = tiempo_transcurrido/CLOCKS_PER_SEC;
-        }        
-        printf("Pasaron %d segundos!\n", time);
-        return 23;
+          }        
+          printf("Pasaron %d segundos!\n", time);
+          return 23;
         }
         // alarm(time);
       }
@@ -258,7 +265,7 @@ int main(int argc, char const *argv[])
           temp = temp->next;
         }
       }
-      pid = fork();
+      // pid = fork();
       if (pid == 0){
         // Proceso hijo para revisar tiempo
         printf("Esperando 10 segundos...\n");
@@ -272,14 +279,13 @@ int main(int argc, char const *argv[])
         printf("Pasaron 10 segundos!\n");
         return 22;
       }
-      else{
-      }
     }
     if (quit){
       destroy_child(child);
       free_user_input(input);
       break;
     }
+    free_user_input(input);
   }
   
 
